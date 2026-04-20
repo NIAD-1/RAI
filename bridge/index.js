@@ -155,6 +155,13 @@ async function startBot() {
   const { state, saveCreds } = authData;
   const { version } = await fetchLatestBaileysVersion();
 
+  // FORCED FIX: The previous pairing code attempts left corrupted data in your database.
+  // We wipe it completely right here to ensure a clean slate for the QR code!
+  if (authData.clearState) {
+    console.log("🧹 Force-clearing corrupted database state on boot...");
+    await authData.clearState();
+  }
+
   const usePairingCode = false; // FORCED OFF: using QR Code mode
 
   sock = makeWASocket({
