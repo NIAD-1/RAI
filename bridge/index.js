@@ -143,26 +143,34 @@ async function usePostgresAuthState(dbUrl) {
 const PHONE_NUMBER = process.env.PHONE_NUMBER || "";
 
 async function startBot() {
-  let authData;
+  // Step 1: Connect to DB and wipe any stale/corrupted auth state FIRST
   if (DATABASE_URL) {
     console.log("💾 Using PostgreSQL for authentication state persistence...");
-    authData = await usePostgresAuthState(DATABASE_URL);
+    const tempAuth = await usePostgresAuthState(DATABASE_URL);
+    if (tempAuth.clearState) {
+      console.log("🧹 Wiping old database auth state to force fresh QR code...");
+      await tempAuth.clearState();
+    }
   } else {
     console.log("📁 Using local file system for authentication state...");
+    if (fs.existsSync(AUTH_FOLDER)) {
+      fs.rmSync(AUTH_FOLDER, { recursive: true });
+      console.log("🧹 Wiped local auth folder for fresh QR code...");
+    }
+  }
+
+  // Step 2: NOW load auth state from the empty DB — this gives us fresh creds
+  let authData;
+  if (DATABASE_URL) {
+    authData = await usePostgresAuthState(DATABASE_URL);
+  } else {
     authData = await useMultiFileAuthState(AUTH_FOLDER);
   }
 
   const { state, saveCreds } = authData;
   const { version } = await fetchLatestBaileysVersion();
 
-  // FORCED FIX: The previous pairing code attempts left corrupted data in your database.
-  // We wipe it completely right here to ensure a clean slate for the QR code!
-  if (authData.clearState) {
-    console.log("🧹 Force-clearing corrupted database state on boot...");
-    await authData.clearState();
-  }
-
-  const usePairingCode = false; // FORCED OFF: using QR Code mode
+  console.log(`📋 Creds registered: ${state.creds.registered}`);  // Should be false
 
   sock = makeWASocket({
     version,
@@ -171,36 +179,15 @@ async function startBot() {
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
     logger,
-    printQRInTerminal: !usePairingCode,
+    printQRInTerminal: true,
   });
 
   sock.ev.on("creds.update", saveCreds);
 
-  // Request pairing code if phone number is set and not yet registered
-  if (usePairingCode) {
-    setTimeout(async () => {
-      try {
-        let code = await sock.requestPairingCode(PHONE_NUMBER);
-        code = code?.match(/.{1,4}/g)?.join('-') || code;
-        console.log("\n╔══════════════════════════════════════════════════╗");
-        console.log("║         WHATSAPP PAIRING CODE                   ║");
-        console.log("╚══════════════════════════════════════════════════╝");
-        console.log(`\n🔑 YOUR CODE: ${code}\n`);
-        console.log("📱 Open WhatsApp on your phone:");
-        console.log("   → Settings → Linked Devices → Link a Device");
-        console.log("   → Tap 'Link with phone number instead'");
-        console.log(`   → Enter this code: ${code}\n`);
-      } catch (err) {
-        console.error("❌ Failed to request pairing code:", err.message);
-        console.log("Falling back to QR code mode...");
-      }
-    }, 3000);
-  }
-
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr && !usePairingCode) {
+    if (qr) {
       latestQR = qr;
       try { fs.writeFileSync("/tmp/latest_qr.txt", qr); } catch(_) {}
       console.log(`\n📋 QR code generated. Raw string: ${qr}\n`);
