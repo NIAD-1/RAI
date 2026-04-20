@@ -40,6 +40,7 @@ const AUTH_FOLDER = "./auth_state";
 const logger = pino({ level: "warn" });
 
 let sock = null;
+let latestQR = null; // Store latest QR for web display
 
 // Global JID routing map
 const jidMap = new Map();
@@ -161,9 +162,12 @@ async function startBot() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log("\n╔══════════════════════════════════════╗");
-      console.log("║   SCAN THIS QR CODE WITH WHATSAPP   ║");
-      console.log("╚══════════════════════════════════════╝\n");
+      latestQR = qr;
+      console.log("\n╔══════════════════════════════════════════════════╗");
+      console.log("║   SCAN QR CODE AT: /qr  (visit your Render URL) ║");
+      console.log("╚══════════════════════════════════════════════════╝");
+      console.log(`🔗 Visit https://YOUR-APP.onrender.com/qr to scan`);
+      console.log(`📋 Raw QR string: ${qr}\n`);
       qrcode.generate(qr, { small: true });
     }
 
@@ -179,6 +183,7 @@ async function startBot() {
         startBot();
       }
     } else if (connection === "open") {
+      latestQR = null; // Clear QR once connected
       console.log("\n✅ WhatsApp connected! Professor AI bridge is live.\n");
     }
   });
@@ -440,6 +445,19 @@ const server = http.createServer(async (req, res) => {
   } else if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "alive", connected: !!sock }));
+  } else if (req.method === "GET" && req.url === "/qr") {
+    res.writeHead(200, { "Content-Type": "text/html" });
+    if (latestQR) {
+      res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scan QR - Professor AI</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>body{background:#111;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0}h1{margin-bottom:8px}p{color:#aaa;margin-top:4px}canvas{border-radius:12px;margin:20px}</style></head>
+<body><h1>🎓 Professor AI</h1><p>Scan this QR code with WhatsApp to connect</p><canvas id="qr"></canvas><p>⏳ QR refreshes every 30s — reload if expired</p>
+<script>QRCode.toCanvas(document.getElementById('qr'),"${latestQR}",{width:300,margin:2},function(e){if(e)document.body.innerHTML='<h1>Error: '+e.message+'</h1>';})</script></body></html>`);
+    } else {
+      res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Professor AI</title>
+<style>body{background:#111;color:#0f0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0}h1{font-size:3em}</style></head>
+<body><h1>✅ Connected!</h1><p>WhatsApp is already linked. No QR needed.</p></body></html>`);
+    }
   } else {
     res.writeHead(404);
     res.end("Not found");
