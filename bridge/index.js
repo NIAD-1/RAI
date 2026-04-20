@@ -155,7 +155,7 @@ async function startBot() {
   const { state, saveCreds } = authData;
   const { version } = await fetchLatestBaileysVersion();
 
-  const usePairingCode = PHONE_NUMBER.length > 0 && !state.creds.registered;
+  const usePairingCode = false; // FORCED OFF: using QR Code mode
 
   sock = makeWASocket({
     version,
