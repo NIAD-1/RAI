@@ -887,47 +887,46 @@ fn sanitize_error_for_user(error: &str, topic: &str) -> String {
 
 // ── QR Code Page (for WhatsApp linking on Render) ──────────────────
 
+// ── QR Code Page (for WhatsApp linking on Render) ──────────────────
+
 pub async fn qr_page() -> impl IntoResponse {
     let qr_string = std::fs::read_to_string("/tmp/latest_qr.txt")
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
 
-    let html = if let Some(qr) = qr_string {
+    if let Some(qr) = qr_string {
         // URL-encode the QR data for the image API
         let encoded: String = qr.chars().map(|c| match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
             _ => format!("%{:02X}", c as u8),
         }).collect();
-        let api_url = format!("https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={}", encoded);
+        let api_url = format!("https://api.qrserver.com/v1/create-qr-code/?size=500x500&format=png&data={}", encoded);
 
-        format!(
-            r#"<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Scan QR - Professor AI</title>
-<style>
-body{{background:#0a0a0a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,-apple-system,sans-serif;margin:0;text-align:center}}
-h1{{font-size:2.5em;margin-bottom:4px}}
-p{{color:#aaa;margin:8px 0}}
-img{{border-radius:16px;margin:24px;width:300px;height:300px;background:#fff;padding:16px}}
-a.download-btn{{background:#25D366;color:#fff;text-decoration:none;padding:12px 24px;border-radius:24px;font-weight:bold;margin-bottom:16px;display:inline-block}}
-.hint{{color:#666;font-size:0.85em}}
-</style></head>
-<body>
-<h1>🎓 Professor AI</h1>
-<p>Scan this QR code or download it to scan later</p>
-<img src="{api_url}" alt="WhatsApp QR Code" />
-<a href="{api_url}" download="whatsapp_qr.png" class="download-btn">⬇️ Download QR Code</a>
-<p class="hint">⏳ QR expires in ~30 seconds — reload page if it fails</p>
-</body></html>"#
-        )
+        // Fetch image directly from server to force immediate download
+        if let Ok(res) = reqwest::get(&api_url).await {
+            if let Ok(bytes) = res.bytes().await {
+                return (
+                    [
+                        (axum::http::header::CONTENT_TYPE, "image/png"),
+                        (axum::http::header::CONTENT_DISPOSITION, "attachment; filename=\"whatsapp_qr.png\"")
+                    ],
+                    bytes.to_vec(),
+                ).into_response();
+            }
+        }
+
+        // Fallback: If backend fetching fails, redirect the user's browser directly to the image
+        axum::response::Redirect::temporary(&api_url).into_response()
     } else {
-        r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>Professor AI</title>
+        axum::response::Html(
+            r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>Professor AI</title>
 <style>
 body{background:#0a0a0a;color:#0f0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0}
 h1{font-size:3em}p{color:#aaa}
 </style></head>
-<body><h1>✅ Connected!</h1><p>WhatsApp is already linked. No QR code needed.</p></body></html>"#.to_string()
-    };
-
-    axum::response::Html(html)
+<body><h1>✅ Connected!</h1><p>WhatsApp is already linked. No QR code needed.</p></body></html>"#
+                .to_string(),
+        ).into_response()
+    }
 }
