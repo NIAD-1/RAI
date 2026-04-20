@@ -922,10 +922,15 @@ pub async fn qr_page() -> impl IntoResponse {
         axum::response::Html(
             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>Professor AI</title>
 <style>
-body{background:#0a0a0a;color:#0f0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0}
-h1{font-size:3em}p{color:#aaa}
+body{background:#0a0a0a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;text-align:center;padding:24px}
+h1{font-size:3em}p{color:#aaa;max-width:600px;line-height:1.6}
+.status{padding:16px;background:#333;border-radius:12px;margin:24px 0;font-family:monospace}
 </style></head>
-<body><h1>✅ Connected!</h1><p>WhatsApp is already linked. No QR code needed.</p></body></html>"#
+<body><h1>⏳ Awaiting QR Code...</h1>
+<p>If you just restarted the server, WhatsApp takes about <strong>10 to 20 seconds</strong> to generate a fresh QR code string.</p>
+<div class="status">Please wait a moment and <b>REFRESH THIS PAGE</b>.</div>
+<p><i>If you are already linked, this is safe to ignore as no new QR code will be generated.</i></p>
+</body></html>"#
                 .to_string(),
         ).into_response()
     }
