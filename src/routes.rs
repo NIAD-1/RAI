@@ -899,21 +899,24 @@ pub async fn qr_page() -> impl IntoResponse {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
             _ => format!("%{:02X}", c as u8),
         }).collect();
+        let api_url = format!("https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={}", encoded);
 
         format!(
             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scan QR - Professor AI</title>
 <style>
-body{{background:#0a0a0a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,-apple-system,sans-serif;margin:0}}
+body{{background:#0a0a0a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,-apple-system,sans-serif;margin:0;text-align:center}}
 h1{{font-size:2.5em;margin-bottom:4px}}
 p{{color:#aaa;margin:8px 0}}
-img{{border-radius:16px;margin:24px;width:300px;height:300px}}
+img{{border-radius:16px;margin:24px;width:300px;height:300px;background:#fff;padding:16px}}
+a.download-btn{{background:#25D366;color:#fff;text-decoration:none;padding:12px 24px;border-radius:24px;font-weight:bold;margin-bottom:16px;display:inline-block}}
 .hint{{color:#666;font-size:0.85em}}
 </style></head>
 <body>
 <h1>🎓 Professor AI</h1>
-<p>Scan this QR code with WhatsApp to connect</p>
-<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded}" alt="WhatsApp QR Code" />
+<p>Scan this QR code or download it to scan later</p>
+<img src="{api_url}" alt="WhatsApp QR Code" />
+<a href="{api_url}" download="whatsapp_qr.png" class="download-btn">⬇️ Download QR Code</a>
 <p class="hint">⏳ QR expires in ~30 seconds — reload page if it fails</p>
 </body></html>"#
         )
