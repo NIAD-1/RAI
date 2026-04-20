@@ -888,9 +888,14 @@ fn sanitize_error_for_user(error: &str, topic: &str) -> String {
 // ── QR Code Page (for WhatsApp linking on Render) ──────────────────
 
 pub async fn qr_page() -> impl IntoResponse {
-    let qr_string = std::fs::read_to_string("/tmp/latest_qr.txt").ok();
+    let qr_string = std::fs::read_to_string("/tmp/latest_qr.txt")
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
 
     let html = if let Some(qr) = qr_string {
+        // JSON-encode the QR string to safely embed in JavaScript
+        let qr_json = serde_json::to_string(&qr).unwrap_or_default();
         format!(
             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scan QR - Professor AI</title>
@@ -908,8 +913,9 @@ canvas{{border-radius:16px;margin:24px;background:#fff;padding:16px}}
 <canvas id="qr"></canvas>
 <p class="hint">⏳ QR expires in ~30 seconds — reload page if it fails</p>
 <script>
-QRCode.toCanvas(document.getElementById('qr'),"{qr}",{{width:300,margin:2,color:{{dark:'#000',light:'#fff'}}}},
-function(e){{if(e)document.body.innerHTML='<h1>Error generating QR</h1><p>'+e.message+'</p>';}});
+var qrData = {qr_json};
+QRCode.toCanvas(document.getElementById('qr'), qrData, {{width:300,margin:2,color:{{dark:'#000',light:'#fff'}}}},
+function(e){{if(e){{document.getElementById('qr').style.display='none';document.querySelector('.hint').textContent='Error: '+e.message+'. Try reloading.';}}}});
 </script>
 </body></html>"#
         )
