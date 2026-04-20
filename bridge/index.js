@@ -133,6 +133,8 @@ async function usePostgresAuthState(dbUrl) {
 
 // ─── Connect to WhatsApp ────────────────────────────────────────────────
 
+const PHONE_NUMBER = process.env.PHONE_NUMBER || "";
+
 async function startBot() {
   let authData;
   if (DATABASE_URL) {
@@ -146,6 +148,8 @@ async function startBot() {
   const { state, saveCreds } = authData;
   const { version } = await fetchLatestBaileysVersion();
 
+  const usePairingCode = PHONE_NUMBER.length > 0 && !state.creds.registered;
+
   sock = makeWASocket({
     version,
     auth: {
@@ -153,23 +157,38 @@ async function startBot() {
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
     logger,
-    printQRInTerminal: false,
+    printQRInTerminal: !usePairingCode,
   });
 
   sock.ev.on("creds.update", saveCreds);
 
+  // Request pairing code if phone number is set and not yet registered
+  if (usePairingCode) {
+    setTimeout(async () => {
+      try {
+        const code = await sock.requestPairingCode(PHONE_NUMBER);
+        console.log("\n╔══════════════════════════════════════════════════╗");
+        console.log("║         WHATSAPP PAIRING CODE                   ║");
+        console.log("╚══════════════════════════════════════════════════╝");
+        console.log(`\n🔑 YOUR CODE: ${code}\n`);
+        console.log("📱 Open WhatsApp on your phone:");
+        console.log("   → Settings → Linked Devices → Link a Device");
+        console.log("   → Tap 'Link with phone number instead'");
+        console.log(`   → Enter this code: ${code}\n`);
+      } catch (err) {
+        console.error("❌ Failed to request pairing code:", err.message);
+        console.log("Falling back to QR code mode...");
+      }
+    }, 3000);
+  }
+
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr) {
+    if (qr && !usePairingCode) {
       latestQR = qr;
-      // Write QR to shared file so the Rust backend can serve it
       try { fs.writeFileSync("/tmp/latest_qr.txt", qr); } catch(_) {}
-      console.log("\n╔══════════════════════════════════════════════════╗");
-      console.log("║   SCAN QR CODE AT: /qr  (visit your Render URL) ║");
-      console.log("╚══════════════════════════════════════════════════╝");
-      console.log(`🔗 Visit https://rai-7x9g.onrender.com/qr to scan`);
-      console.log(`📋 Raw QR string: ${qr}\n`);
+      console.log(`\n📋 QR code generated. Raw string: ${qr}\n`);
       qrcode.generate(qr, { small: true });
     }
 
@@ -185,7 +204,7 @@ async function startBot() {
         startBot();
       }
     } else if (connection === "open") {
-      latestQR = null; // Clear QR once connected
+      latestQR = null;
       try { fs.unlinkSync("/tmp/latest_qr.txt"); } catch(_) {}
       console.log("\n✅ WhatsApp connected! Professor AI bridge is live.\n");
     }
