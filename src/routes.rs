@@ -894,29 +894,27 @@ pub async fn qr_page() -> impl IntoResponse {
         .filter(|s| !s.is_empty());
 
     let html = if let Some(qr) = qr_string {
-        // JSON-encode the QR string to safely embed in JavaScript
-        let qr_json = serde_json::to_string(&qr).unwrap_or_default();
+        // URL-encode the QR data for the image API
+        let encoded: String = qr.chars().map(|c| match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+            _ => format!("%{:02X}", c as u8),
+        }).collect();
+
         format!(
             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scan QR - Professor AI</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 body{{background:#0a0a0a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,-apple-system,sans-serif;margin:0}}
 h1{{font-size:2.5em;margin-bottom:4px}}
 p{{color:#aaa;margin:8px 0}}
-canvas{{border-radius:16px;margin:24px;background:#fff;padding:16px}}
+img{{border-radius:16px;margin:24px;width:300px;height:300px}}
 .hint{{color:#666;font-size:0.85em}}
 </style></head>
 <body>
 <h1>🎓 Professor AI</h1>
 <p>Scan this QR code with WhatsApp to connect</p>
-<canvas id="qr"></canvas>
+<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded}" alt="WhatsApp QR Code" />
 <p class="hint">⏳ QR expires in ~30 seconds — reload page if it fails</p>
-<script>
-var qrData = {qr_json};
-QRCode.toCanvas(document.getElementById('qr'), qrData, {{width:300,margin:2,color:{{dark:'#000',light:'#fff'}}}},
-function(e){{if(e){{document.getElementById('qr').style.display='none';document.querySelector('.hint').textContent='Error: '+e.message+'. Try reloading.';}}}});
-</script>
 </body></html>"#
         )
     } else {
