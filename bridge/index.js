@@ -128,6 +128,13 @@ async function usePostgresAuthState(dbUrl) {
       },
     },
     saveCreds: () => writeData("creds", creds),
+    clearState: async () => {
+      try {
+        await client.query("DELETE FROM baileys_auth");
+      } catch (e) {
+        console.error("Error clearing DB state:", e);
+      }
+    },
   };
 }
 
@@ -195,9 +202,16 @@ async function startBot() {
     if (connection === "close") {
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
       if (reason === DisconnectReason.loggedOut) {
-        console.log("❌ Logged out. Delete local state and restart to re-scan.");
-        if (!DATABASE_URL && fs.existsSync(AUTH_FOLDER)) {
-          fs.rmSync(AUTH_FOLDER, { recursive: true });
+        console.log("❌ Logged out. Clearing local/DB state and restarting to re-link.");
+        if (DATABASE_URL && authData.clearState) {
+          authData.clearState().then(() => {
+             startBot();
+          });
+        } else {
+          if (!DATABASE_URL && fs.existsSync(AUTH_FOLDER)) {
+            fs.rmSync(AUTH_FOLDER, { recursive: true });
+          }
+          startBot();
         }
       } else {
         console.log(`⚠️  Connection closed (reason ${reason}). Reconnecting...`);
