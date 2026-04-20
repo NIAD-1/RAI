@@ -884,3 +884,43 @@ fn sanitize_error_for_user(error: &str, topic: &str) -> String {
         )
     }
 }
+
+// ── QR Code Page (for WhatsApp linking on Render) ──────────────────
+
+pub async fn qr_page() -> impl IntoResponse {
+    let qr_string = std::fs::read_to_string("/tmp/latest_qr.txt").ok();
+
+    let html = if let Some(qr) = qr_string {
+        format!(
+            r#"<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scan QR - Professor AI</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+body{{background:#0a0a0a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,-apple-system,sans-serif;margin:0}}
+h1{{font-size:2.5em;margin-bottom:4px}}
+p{{color:#aaa;margin:8px 0}}
+canvas{{border-radius:16px;margin:24px;background:#fff;padding:16px}}
+.hint{{color:#666;font-size:0.85em}}
+</style></head>
+<body>
+<h1>🎓 Professor AI</h1>
+<p>Scan this QR code with WhatsApp to connect</p>
+<canvas id="qr"></canvas>
+<p class="hint">⏳ QR expires in ~30 seconds — reload page if it fails</p>
+<script>
+QRCode.toCanvas(document.getElementById('qr'),"{qr}",{{width:300,margin:2,color:{{dark:'#000',light:'#fff'}}}},
+function(e){{if(e)document.body.innerHTML='<h1>Error generating QR</h1><p>'+e.message+'</p>';}});
+</script>
+</body></html>"#
+        )
+    } else {
+        r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>Professor AI</title>
+<style>
+body{background:#0a0a0a;color:#0f0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0}
+h1{font-size:3em}p{color:#aaa}
+</style></head>
+<body><h1>✅ Connected!</h1><p>WhatsApp is already linked. No QR code needed.</p></body></html>"#.to_string()
+    };
+
+    axum::response::Html(html)
+}

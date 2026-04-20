@@ -79,6 +79,8 @@ async fn main() {
         .route("/admin/feedback", get(routes::admin_feedback))
         // Simulation endpoint (for local testing without Telegram)
         .route("/simulate", post(routes::simulate_research))
+        // QR code page for WhatsApp linking
+        .route("/qr", get(routes::qr_page))
         .layer(CorsLayer::permissive())
         .with_state(state.clone());
 

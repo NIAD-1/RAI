@@ -163,10 +163,12 @@ async function startBot() {
 
     if (qr) {
       latestQR = qr;
+      // Write QR to shared file so the Rust backend can serve it
+      try { fs.writeFileSync("/tmp/latest_qr.txt", qr); } catch(_) {}
       console.log("\n╔══════════════════════════════════════════════════╗");
       console.log("║   SCAN QR CODE AT: /qr  (visit your Render URL) ║");
       console.log("╚══════════════════════════════════════════════════╝");
-      console.log(`🔗 Visit https://YOUR-APP.onrender.com/qr to scan`);
+      console.log(`🔗 Visit https://rai-7x9g.onrender.com/qr to scan`);
       console.log(`📋 Raw QR string: ${qr}\n`);
       qrcode.generate(qr, { small: true });
     }
@@ -184,6 +186,7 @@ async function startBot() {
       }
     } else if (connection === "open") {
       latestQR = null; // Clear QR once connected
+      try { fs.unlinkSync("/tmp/latest_qr.txt"); } catch(_) {}
       console.log("\n✅ WhatsApp connected! Professor AI bridge is live.\n");
     }
   });
