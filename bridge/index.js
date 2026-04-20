@@ -16,7 +16,7 @@ import makeWASocket, {
   proto,
 } from "@whiskeysockets/baileys";
 import pg from "pg";
-const { Client } = pg;
+const { Pool } = pg;
 import { Boom } from "@hapi/boom";
 import pino from "pino";
 import qrcode from "qrcode-terminal";
@@ -52,11 +52,11 @@ const seenUsers = new Set();
 // ─── PostgreSQL Auth State Implementation ─────────────────────────────
 
 async function usePostgresAuthState(dbUrl) {
-  const client = new Client({
+  const client = new Pool({
     connectionString: dbUrl,
     ssl: { rejectUnauthorized: false },
+    max: 5,
   });
-  await client.connect();
 
   // Create table if it doesn't exist
   await client.query(`
