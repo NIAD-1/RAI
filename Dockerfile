@@ -45,9 +45,8 @@ RUN cd bridge && npm install
 # Copy Python Scripts
 COPY scripts ./scripts
 
-# Copy other required dirs
-COPY feedback ./feedback
-COPY papers ./papers
+# Create required data dirs
+RUN mkdir -p feedback papers
 
 # Create start script
 COPY scripts/start.sh /usr/local/bin/start.sh
