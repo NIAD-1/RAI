@@ -294,7 +294,7 @@ async function startBot() {
         const isGreeting = ["hi", "hello", "hey", "start", "/start", "help", "/help", "menu"].includes(lower) 
           || (lower.length < 15 && (lower.startsWith("hi ") || lower.startsWith("hello ") || lower.startsWith("hey ")));
         if (isGreeting) {
-          const welcomeMsg = `🎓 *Welcome to Professor AI!*\n\nHi ${pushName || "there"}! I'm your autonomous academic research assistant. This is your first time here, so let me show you around:\n\n📝 *Quick Research Brief*\nJust type any topic and I'll research it instantly.\n_Example: "Effects of social media on mental health"_\n\n📄 *Full PDF Report*\nType \`report:\` followed by your topic for a detailed academic paper.\n_Example: "report: impact of AI on healthcare"_\n\n🧠 *I Remember Context*\nAsk follow-up questions and I'll understand what you mean!\n\n🔄 *Reset Context*\nType \`/clear\` to start fresh.\n\nSend a topic whenever you're ready! 🚀`;
+          const welcomeMsg = `*Professor AI* — Research Assistant\n━━━━━━━━━━━━━━━━━━━━━━━━\n\nHi ${pushName || "there"}, welcome.\n\nI generate research reports using live data from academic sources, YouTube, web publications, and public forums.\n\n*How to use:*\n\n▸ *Quick brief* — Just type any topic\n   _e.g. "How does AI affect supply chains?"_\n\n▸ *Full PDF report* — Type \`report:\` + topic\n   _e.g. "report: blockchain in healthcare"_\n\n▸ *Follow-ups* — Ask me to expand or clarify\n▸ *Reset* — Type /clear to start fresh\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n_Powered by live academic research • v2.0_`;
           try {
             await sock.sendPresenceUpdate("paused", chatJid);
             await sock.sendMessage(chatJid, { text: welcomeMsg });
