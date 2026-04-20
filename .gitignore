@@ -1,0 +1,26 @@
+# ── Secrets ──────────
+.env
+auth_state/
+*.p12
+*.pem
+*.key
+
+# ── Dependencies ──────
+node_modules/
+target/
+venv/
+.venv/
+
+# ── OS / IDE ──────────
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── App Data ──────────
+feedback/
+papers/
+*.log
+__pycache__/
+*.pyc

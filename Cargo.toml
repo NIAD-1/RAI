@@ -1,0 +1,39 @@
+[package]
+name = "research-bot"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Web framework
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+
+# HTTP client (for WhatsApp & Paystack API calls)
+reqwest = { version = "0.12", features = ["json", "multipart"] }
+
+# Crypto (for Paystack webhook signature verification)
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Unique IDs
+uuid = { version = "1", features = ["v4"] }
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Environment variables
+dotenvy = "0.15"
+urlencoding = "2.1.3"

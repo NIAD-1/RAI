@@ -1,0 +1,17 @@
+{
+  "name": "pocket-watcher-bridge",
+  "version": "1.0.0",
+  "description": "Baileys WhatsApp bridge for Pocket Watcher",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "link-preview-js": "^3.2.0",
+    "pg": "^8.11.0",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
