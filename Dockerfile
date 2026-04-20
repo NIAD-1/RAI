@@ -12,7 +12,7 @@ COPY src ./src
 RUN touch src/main.rs && cargo build --release
 
 # --- Final Stage ---
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Install system dependencies
 # 1. ca-certificates & openssl (for https/rust)
