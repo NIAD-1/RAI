@@ -143,34 +143,21 @@ async function usePostgresAuthState(dbUrl) {
 const PHONE_NUMBER = process.env.PHONE_NUMBER || "";
 
 async function startBot() {
-  // Step 1: Connect to DB and wipe any stale/corrupted auth state FIRST
-  if (DATABASE_URL) {
-    console.log("💾 Using PostgreSQL for authentication state persistence...");
-    const tempAuth = await usePostgresAuthState(DATABASE_URL);
-    if (tempAuth.clearState) {
-      console.log("🧹 Wiping old database auth state to force fresh QR code...");
-      await tempAuth.clearState();
-    }
-  } else {
-    console.log("📁 Using local file system for authentication state...");
-    if (fs.existsSync(AUTH_FOLDER)) {
-      fs.rmSync(AUTH_FOLDER, { recursive: true });
-      console.log("🧹 Wiped local auth folder for fresh QR code...");
-    }
-  }
-
-  // Step 2: NOW load auth state from the empty DB — this gives us fresh creds
+  // Load auth state — do NOT wipe on every boot or QR scanning will time out.
+  // We only clear state on explicit loggedOut events (handled below).
   let authData;
   if (DATABASE_URL) {
+    console.log("💾 Using PostgreSQL for authentication state persistence...");
     authData = await usePostgresAuthState(DATABASE_URL);
   } else {
+    console.log("📁 Using local file system for authentication state...");
     authData = await useMultiFileAuthState(AUTH_FOLDER);
   }
 
   const { state, saveCreds } = authData;
   const { version } = await fetchLatestBaileysVersion();
 
-  console.log(`📋 Creds registered: ${state.creds.registered}`);  // Should be false
+  console.log(`📋 Creds registered: ${state.creds.registered}`);
 
   sock = makeWASocket({
     version,
@@ -190,7 +177,7 @@ async function startBot() {
     if (qr) {
       latestQR = qr;
       try { fs.writeFileSync("/tmp/latest_qr.txt", qr); } catch(_) {}
-      console.log(`\n📋 QR code generated. Raw string: ${qr}\n`);
+      console.log(`\n📋 QR code ready — visit /qr to scan\n`);
       qrcode.generate(qr, { small: true });
     }
 

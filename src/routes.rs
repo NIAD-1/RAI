@@ -896,42 +896,79 @@ pub async fn qr_page() -> impl IntoResponse {
         .filter(|s| !s.is_empty());
 
     if let Some(qr) = qr_string {
-        // URL-encode the QR data for the image API
         let encoded: String = qr.chars().map(|c| match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-            _ => format!("%{:02X}", c as u8),
+            _ => format!("%{:02X}", c as u32 as u8),
         }).collect();
-        let api_url = format!("https://api.qrserver.com/v1/create-qr-code/?size=500x500&format=png&data={}", encoded);
+        let img_url = format!("https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data={}", encoded);
 
-        // Fetch image directly from server to force immediate download
-        if let Ok(res) = reqwest::get(&api_url).await {
-            if let Ok(bytes) = res.bytes().await {
-                return (
-                    [
-                        (axum::http::header::CONTENT_TYPE, "image/png"),
-                        (axum::http::header::CONTENT_DISPOSITION, "attachment; filename=\"whatsapp_qr.png\"")
-                    ],
-                    bytes.to_vec(),
-                ).into_response();
-            }
-        }
-
-        // Fallback: If backend fetching fails, redirect the user's browser directly to the image
-        axum::response::Redirect::temporary(&api_url).into_response()
-    } else {
-        axum::response::Html(
-            r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>Professor AI</title>
+        axum::response::Html(format!(r#"<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Professor AI — Scan to Link</title>
 <style>
-body{background:#0a0a0a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;text-align:center;padding:24px}
-h1{font-size:3em}p{color:#aaa;max-width:600px;line-height:1.6}
-.status{padding:16px;background:#333;border-radius:12px;margin:24px 0;font-family:monospace}
-</style></head>
-<body><h1>⏳ Awaiting QR Code...</h1>
-<p>If you just restarted the server, WhatsApp takes about <strong>10 to 20 seconds</strong> to generate a fresh QR code string.</p>
-<div class="status">Please wait a moment and <b>REFRESH THIS PAGE</b>.</div>
-<p><i>If you are already linked, this is safe to ignore as no new QR code will be generated.</i></p>
-</body></html>"#
-                .to_string(),
-        ).into_response()
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; padding: 24px; text-align: center; }}
+  h1 {{ font-size: 2em; margin-bottom: 8px; }}
+  .subtitle {{ color: #aaa; margin-bottom: 24px; font-size: 1.05em; }}
+  .qr-wrap {{ background: #fff; border-radius: 20px; padding: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 0 60px rgba(37,211,102,0.3); }}
+  .qr-wrap img {{ display: block; width: 280px; height: 280px; }}
+  .timer {{ color: #25D366; font-size: 1.1em; font-weight: bold; margin-bottom: 8px; }}
+  .hint {{ color: #666; font-size: 0.85em; max-width: 400px; line-height: 1.6; }}
+  .steps {{ background: #111; border-radius: 12px; padding: 16px 24px; margin: 20px 0; text-align: left; max-width: 400px; }}
+  .steps li {{ color: #ccc; margin: 6px 0; font-size: 0.9em; }}
+  .bar {{ width: 280px; height: 4px; background: #222; border-radius: 4px; margin: 0 auto 8px; overflow: hidden; }}
+  .fill {{ height: 100%; background: #25D366; animation: drain 28s linear forwards; }}
+  @keyframes drain {{ from {{ width: 100%; }} to {{ width: 0%; }} }}
+</style>
+</head>
+<body>
+<h1>🎓 Professor AI</h1>
+<p class="subtitle">Scan with WhatsApp to connect your AI assistant</p>
+<div class="qr-wrap">
+  <img id="qrimg" src="{img_url}" alt="WhatsApp QR Code">
+</div>
+<div class="bar"><div class="fill" id="fill"></div></div>
+<p class="timer" id="timer">⏱ Refreshing in <span id="secs">28</span>s</p>
+<ol class="steps">
+  <li>Open <strong>WhatsApp</strong> on your phone</li>
+  <li>Tap <strong>⋮ Menu → Linked Devices</strong></li>
+  <li>Tap <strong>Link a Device</strong></li>
+  <li>Point camera at the QR code above</li>
+</ol>
+<p class="hint">The QR code expires every 30 seconds. This page auto-refreshes it for you — just scan quickly once it appears!</p>
+<script>
+  let secs = 28;
+  const secsEl = document.getElementById('secs');
+  const timer = setInterval(() => {{
+    secs--;
+    secsEl.textContent = secs;
+    if (secs <= 0) {{
+      clearInterval(timer);
+      window.location.reload();
+    }}
+  }}, 1000);
+</script>
+</body></html>"#))
+    } else {
+        axum::response::Html(r#"<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="5">
+<title>Professor AI</title>
+<style>
+  body {{ background: #0a0a0a; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: system-ui; margin: 0; text-align: center; padding: 24px; }}
+  h1 {{ font-size: 2.5em; margin-bottom: 12px; }}
+  p {{ color: #aaa; max-width: 480px; line-height: 1.7; }}
+  .dot {{ animation: pulse 1s infinite; display: inline-block; }}
+  @keyframes pulse {{ 0%,100%{{ opacity:1; }} 50%{{ opacity:0.3; }} }}
+</style>
+</head>
+<body>
+<h1>⏳ Generating QR<span class="dot">...</span></h1>
+<p>WhatsApp takes a few seconds to generate a fresh QR code after a restart.<br><strong>This page will auto-refresh every 5 seconds</strong> until the code is ready.</p>
+</body></html>"#.to_string())
     }
 }
+
