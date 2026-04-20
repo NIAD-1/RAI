@@ -173,7 +173,8 @@ async function startBot() {
   if (usePairingCode) {
     setTimeout(async () => {
       try {
-        const code = await sock.requestPairingCode(PHONE_NUMBER);
+        let code = await sock.requestPairingCode(PHONE_NUMBER);
+        code = code?.match(/.{1,4}/g)?.join('-') || code;
         console.log("\n╔══════════════════════════════════════════════════╗");
         console.log("║         WHATSAPP PAIRING CODE                   ║");
         console.log("╚══════════════════════════════════════════════════╝");
