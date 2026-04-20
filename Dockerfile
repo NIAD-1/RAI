@@ -1,5 +1,5 @@
 # --- Build Stage (Rust) ---
-FROM rust:1.77-slim AS rust-builder
+FROM rust:1.80-slim AS rust-builder
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
