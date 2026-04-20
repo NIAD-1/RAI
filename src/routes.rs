@@ -47,17 +47,6 @@ pub async fn whatsapp_bridge_incoming(
 
     let sender_key = whatsapp_sender_key(&payload.sender);
 
-    if let Some(ref allowed) = state.config.allowed_users {
-        if !allowed.contains(&sender_key) {
-            return (StatusCode::FORBIDDEN, Json(WhatsAppBridgeResponse {
-                reply: None,
-                document_base64: None,
-                document_filename: None,
-                document_caption: None,
-            })).into_response();
-        }
-    }
-
     let text = services::sanitize_topic(&payload.body);
     if text.is_empty() {
         return Json(WhatsAppBridgeResponse {
@@ -243,16 +232,6 @@ pub async fn whatsapp_bridge_audio(
     }
 
     let sender_key = whatsapp_sender_key(&payload.sender);
-    if let Some(ref allowed) = state.config.allowed_users {
-        if !allowed.contains(&sender_key) {
-            return (StatusCode::FORBIDDEN, Json(WhatsAppBridgeResponse {
-                reply: None,
-                document_base64: None,
-                document_filename: None,
-                document_caption: None,
-            })).into_response();
-        }
-    }
     Json(WhatsAppBridgeResponse {
         reply: Some(
             "Voice note research is not enabled yet. Send text like `Explain the future of lithium batteries` or `report: impact of AI on healthcare logistics`."
