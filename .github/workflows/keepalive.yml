@@ -1,0 +1,17 @@
+name: Keep Render App Alive
+
+on:
+  schedule:
+    # Runs every 5 minutes
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping WhatsApp Bot URL
+        run: |
+          echo "Pinging https://rai-7x9g.onrender.com to prevent sleep..."
+          curl -I https://rai-7x9g.onrender.com/qr
+          echo "Ping complete."
