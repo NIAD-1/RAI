@@ -210,7 +210,9 @@ pub async fn reformulate_query(
         Ok(reformulated) => {
             let reformulated = reformulated.trim().to_string();
             if reformulated.is_empty() || reformulated.len() > 500 {
-                tracing::warn!("Reformulation returned empty or excessively long result, using original query");
+                tracing::warn!(
+                    "Reformulation returned empty or excessively long result, using original query"
+                );
                 new_query.to_string()
             } else {
                 tracing::info!(
@@ -1046,7 +1048,9 @@ pub async fn run_gutendex_subagent(topic: &str) -> Vec<ResearchSource> {
 
     if let Some(results) = json["results"].as_array() {
         for result in results.iter().take(3) {
-            let title = result["title"].as_str().unwrap_or("Untitled public-domain book");
+            let title = result["title"]
+                .as_str()
+                .unwrap_or("Untitled public-domain book");
             let author = result["authors"]
                 .as_array()
                 .and_then(|authors| authors.first())
@@ -1107,9 +1111,7 @@ pub async fn run_gutendex_subagent(topic: &str) -> Vec<ResearchSource> {
     sources
 }
 
-fn preferred_gutendex_download_url(
-    formats: &serde_json::Map<String, serde_json::Value>,
-) -> String {
+fn preferred_gutendex_download_url(formats: &serde_json::Map<String, serde_json::Value>) -> String {
     for preferred in [
         "text/plain; charset=utf-8",
         "application/epub+zip",
@@ -1133,14 +1135,13 @@ async fn gather_live_sources(
     tavily_key: &str,
     topic: &str,
 ) -> Vec<ResearchSource> {
-    let (youtube_sources, tavily_sources, reddit_sources, openlibrary_sources, gutendex_sources) =
-        tokio::join!(
-            run_youtube_subagent(youtube_key, topic),
-            run_tavily_subagent(tavily_key, topic),
-            run_reddit_subagent(topic),
-            run_openlibrary_subagent(topic),
-            run_gutendex_subagent(topic),
-        );
+    let (youtube_sources, tavily_sources, reddit_sources, openlibrary_sources, gutendex_sources) = tokio::join!(
+        run_youtube_subagent(youtube_key, topic),
+        run_tavily_subagent(tavily_key, topic),
+        run_reddit_subagent(topic),
+        run_openlibrary_subagent(topic),
+        run_gutendex_subagent(topic),
+    );
 
     dedupe_sources(
         youtube_sources
@@ -1273,7 +1274,9 @@ pub async fn run_research_agent(
     let mut deferred_sections = Vec::new();
 
     if let Some(tx) = &progress {
-        let _ = tx.send("Plan created. Drafting core chapters...".to_string()).await;
+        let _ = tx
+            .send("Plan created. Drafting core chapters...".to_string())
+            .await;
     }
 
     for blueprint in &spec.section_blueprints {
@@ -1321,7 +1324,9 @@ pub async fn run_research_agent(
         let mut revision_pass = 0;
         loop {
             if let Some(tx) = &progress {
-                let _ = tx.send("Compiling references and running academic quality checks...".to_string()).await;
+                let _ = tx
+                    .send("Compiling references and running academic quality checks...".to_string())
+                    .await;
             }
             let references =
                 match generate_references_section(google_key, model, report_context, &sections)
@@ -1342,7 +1347,9 @@ pub async fn run_research_agent(
 
             if report_quality_passes(&quality) {
                 if let Some(tx) = &progress {
-                    let _ = tx.send("Quality checks passed. Assembling final PDF...".to_string()).await;
+                    let _ = tx
+                        .send("Quality checks passed. Assembling final PDF...".to_string())
+                        .await;
                 }
                 break (references, markdown, quality);
             }
@@ -1360,6 +1367,10 @@ pub async fn run_research_agent(
                 revision_pass + 1,
                 report_failure_summary(&quality)
             );
+
+            // cooldown before revision to let per-minute rate limits reset
+            tracing::info!("⏳ Cooling down 20s before revision pass to respect rate limits...");
+            tokio::time::sleep(std::time::Duration::from_secs(20)).await;
 
             sections =
                 revise_report_sections(google_key, model, report_context, &sections, &quality)
@@ -2607,6 +2618,7 @@ fn analyze_report_quality(
     citation_target: usize,
     reference_style: &ReferenceStyle,
 ) -> ResearchQualityReport {
+    let narrative_markdown = report_body_for_quality(markdown, reference_style);
     let missing_headings = spec
         .section_blueprints
         .iter()
@@ -2619,11 +2631,11 @@ fn analyze_report_quality(
             }
         })
         .collect::<Vec<_>>();
-    let banned_phrase_hits = collect_banned_phrase_hits(markdown);
-    let bullet_free = markdown.lines().all(|line| !is_bullet_line(line));
+    let banned_phrase_hits = collect_banned_phrase_hits(narrative_markdown);
+    let bullet_free = narrative_markdown.lines().all(|line| !is_bullet_line(line));
     let prose_only = bullet_free && banned_phrase_hits.is_empty();
-    let citation_mentions = count_citation_mentions(markdown);
-    let actual_word_count = count_words(markdown);
+    let citation_mentions = count_citation_mentions(narrative_markdown);
+    let actual_word_count = count_words(narrative_markdown);
 
     ResearchQualityReport {
         required_headings_present: missing_headings.is_empty(),
@@ -2631,7 +2643,8 @@ fn analyze_report_quality(
             .contains(&format!("## {}", reference_style.bibliography_heading())),
         bullet_free,
         prose_only,
-        minimum_word_count_met: actual_word_count >= (spec.minimum_words * SECTION_WORD_FLOOR_PERCENT) / 100,
+        minimum_word_count_met: actual_word_count
+            >= (spec.minimum_words * SECTION_WORD_FLOOR_PERCENT) / 100,
         citation_target_met: citation_mentions >= citation_target,
         actual_word_count,
         minimum_word_count: (spec.minimum_words * SECTION_WORD_FLOOR_PERCENT) / 100,
@@ -2640,6 +2653,14 @@ fn analyze_report_quality(
         missing_headings,
         banned_phrase_hits,
     }
+}
+
+fn report_body_for_quality<'a>(markdown: &'a str, reference_style: &ReferenceStyle) -> &'a str {
+    let bibliography_heading = format!("## {}", reference_style.bibliography_heading());
+    markdown
+        .split_once(&bibliography_heading)
+        .map(|(body, _)| body.trim_end())
+        .unwrap_or(markdown)
 }
 
 async fn persist_report_artifacts(report: &ResearchReport) -> Result<ResearchArtifacts, String> {
@@ -2743,9 +2764,11 @@ async fn call_google_model(
     let max_retries = 3u32;
     let mut last_error = String::new();
 
+    let mut rate_limit_hint: Option<u64> = None;
     for attempt in 0..=max_retries {
         if attempt > 0 {
-            let delay = std::time::Duration::from_secs(30 * 2u64.pow(attempt - 1)); // 30s, 60s, 120s
+            let base_delay = rate_limit_hint.take().unwrap_or(30 * 2u64.pow(attempt - 1));
+            let delay = std::time::Duration::from_secs(base_delay);
             tracing::warn!(
                 "🔄 Retrying API call (attempt {}/{}) after {}s backoff...",
                 attempt + 1,
@@ -2787,8 +2810,8 @@ async fn call_google_model(
 
             last_error = format!("Model API error ({}): {}", status, err_msg);
 
-            // Retry on rate limit (429) or server overload (503)
-            if (status.as_u16() == 429 || status.as_u16() == 503) && attempt < max_retries {
+            if should_retry_model_status(status, err_msg) && attempt < max_retries {
+                rate_limit_hint = extract_retry_delay_secs(err_msg);
                 continue;
             }
 
@@ -2801,7 +2824,11 @@ async fn call_google_model(
             .and_then(|candidate| candidate["content"]["parts"].as_array())
             .and_then(|parts| {
                 parts.iter().find_map(|part| {
-                    if part.get("thought").and_then(|t| t.as_bool()).unwrap_or(false) {
+                    if part
+                        .get("thought")
+                        .and_then(|t| t.as_bool())
+                        .unwrap_or(false)
+                    {
                         None
                     } else {
                         part["text"].as_str().map(str::to_string)
@@ -2895,7 +2922,7 @@ async fn call_google_model_json(
 
             last_error = format!("Model JSON planning error ({}): {}", status, err_msg);
 
-            if (status.as_u16() == 429 || status.as_u16() == 503) && attempt < max_retries {
+            if should_retry_model_status(status, err_msg) && attempt < max_retries {
                 continue;
             }
 
@@ -2908,7 +2935,11 @@ async fn call_google_model_json(
             .and_then(|candidate| candidate["content"]["parts"].as_array())
             .and_then(|parts| {
                 parts.iter().find_map(|part| {
-                    if part.get("thought").and_then(|t| t.as_bool()).unwrap_or(false) {
+                    if part
+                        .get("thought")
+                        .and_then(|t| t.as_bool())
+                        .unwrap_or(false)
+                    {
                         None
                     } else {
                         part["text"].as_str().map(str::to_string)
@@ -2932,9 +2963,11 @@ fn derive_citation_key(source: &ResearchSource) -> String {
         if a.contains('.') && !a.contains(' ') {
             // Try to get a readable name from common domains
             let readable = match a {
-                s if s.contains("ncbi.nlm.nih.gov") || s.contains("pmc.ncbi.nlm.nih.gov") => "National Institutes of Health",
-                s if s.contains("bbc.")  => "BBC News",
-                s if s.contains("cnn.")  => "CNN",
+                s if s.contains("ncbi.nlm.nih.gov") || s.contains("pmc.ncbi.nlm.nih.gov") => {
+                    "National Institutes of Health"
+                }
+                s if s.contains("bbc.") => "BBC News",
+                s if s.contains("cnn.") => "CNN",
                 s if s.contains("nature.com") => "Nature",
                 s if s.contains("sciencedirect") => "ScienceDirect",
                 s if s.contains("mdpi.com") => "MDPI",
@@ -3006,7 +3039,11 @@ fn render_source_dossier(sources: &[ResearchSource]) -> String {
             index + 1,
             key,
             source.title,
-            if source.url.is_empty() { "N/A" } else { &source.url },
+            if source.url.is_empty() {
+                "N/A"
+            } else {
+                &source.url
+            },
             year_label,
             source.summary,
         ));
@@ -3027,7 +3064,11 @@ fn render_whatsapp_source_packets(sources: &[ResearchSource]) -> String {
             source.source_type,
             source.title,
             source.author_or_channel,
-            if source.url.is_empty() { "N/A" } else { &source.url },
+            if source.url.is_empty() {
+                "N/A"
+            } else {
+                &source.url
+            },
             source.summary.replace('\n', " "),
         ));
     }
@@ -3102,7 +3143,6 @@ fn fallback_whatsapp_brief(topic: &str, sources: &[ResearchSource]) -> String {
 
     brief
 }
-
 
 fn render_research_questions(questions: &[String]) -> String {
     if questions.is_empty() {
@@ -3698,6 +3738,23 @@ fn extract_json_object(text: &str) -> Result<String, String> {
     Ok(text[start..=end].to_string())
 }
 
+fn should_retry_model_status(status: reqwest::StatusCode, _err_msg: &str) -> bool {
+    matches!(status.as_u16(), 429 | 503)
+}
+
+/// Extract a retry delay hint from a Google API error message like
+/// "Please retry in 14.59s".
+fn extract_retry_delay_secs(err_msg: &str) -> Option<u64> {
+    let lower = err_msg.to_lowercase();
+    if let Some(pos) = lower.find("retry in ") {
+        let after = &lower[pos + 9..];
+        let num_str: String = after.chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
+        num_str.parse::<f64>().ok().map(|secs| (secs.ceil() as u64).max(5))
+    } else {
+        None
+    }
+}
+
 fn fallback_references(sources: &[ResearchSource], reference_style: &ReferenceStyle) -> String {
     let mut references = format!("## {}\n\n", reference_style.bibliography_heading());
 
@@ -4167,6 +4224,50 @@ mod tests {
     }
 
     #[test]
+    fn quality_ignores_numbered_references_for_prose_and_citations() {
+        let spec = DocumentSpec {
+            deliverable: "paper",
+            minimum_words: 10,
+            section_blueprints: vec![SectionBlueprint {
+                heading: "Introduction",
+                brief: "Set up the topic",
+                target_words: 10,
+                citation_expectation: "Use at least one citation.",
+                minimum_citations: 1,
+                parts: Vec::new(),
+            }],
+            include_source_matrix: false,
+        };
+        let markdown = "# Title\n\n## Introduction\n\nFinal prose with evidence (Ada, 2024).\n\n## References\n\n1. Ada, A. (2024). Example article.\n2. Baker, B. (2023). Another article.\n";
+        let quality = analyze_report_quality(markdown, &spec, 1, &ReferenceStyle::Apa);
+
+        assert!(quality.references_present);
+        assert!(quality.bullet_free);
+        assert!(quality.prose_only);
+        assert_eq!(quality.citation_mentions, 1);
+        assert_eq!(
+            quality.actual_word_count,
+            count_words(report_body_for_quality(markdown, &ReferenceStyle::Apa))
+        );
+    }
+
+    #[test]
+    fn quota_exhaustion_429_is_not_retried() {
+        assert!(!should_retry_model_status(
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            "Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_paid_tier_input_token_count"
+        ));
+        assert!(should_retry_model_status(
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            "Transient rate limit hit, please retry in 10 seconds"
+        ));
+        assert!(should_retry_model_status(
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            "Backend overloaded"
+        ));
+    }
+
+    #[test]
     fn slugify_collapses_symbols() {
         assert_eq!(
             slugify("AI & Supply Chain: Nigeria 2025"),
@@ -4235,7 +4336,10 @@ pub async fn send_whatsapp_message(to: &str, text: &str) {
     });
     match reqwest::Client::new()
         .post("http://localhost:8002/send")
-        .header("X-Bridge-Auth", std::env::var("BRIDGE_SECRET").unwrap_or_else(|_| "local_dev_secret_123".to_string()))
+        .header(
+            "X-Bridge-Auth",
+            std::env::var("BRIDGE_SECRET").unwrap_or_else(|_| "local_dev_secret_123".to_string()),
+        )
         .json(&payload)
         .send()
         .await
@@ -4261,7 +4365,10 @@ pub async fn send_whatsapp_document(to: &str, text: &str, db64: &str, fname: &st
     });
     match reqwest::Client::new()
         .post("http://localhost:8002/send")
-        .header("X-Bridge-Auth", std::env::var("BRIDGE_SECRET").unwrap_or_else(|_| "local_dev_secret_123".to_string()))
+        .header(
+            "X-Bridge-Auth",
+            std::env::var("BRIDGE_SECRET").unwrap_or_else(|_| "local_dev_secret_123".to_string()),
+        )
         .json(&payload)
         .send()
         .await
